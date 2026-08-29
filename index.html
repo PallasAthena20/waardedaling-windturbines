@@ -66,15 +66,35 @@
         <!-- Input panel -->
         <div class="card" id="input-panel">
           <h2>Windturbines invoeren</h2>
-          <p class="card-desc">Zoek een plaats, adres of postcode en kies de tiphoogte-categorie. Voeg zoveel turbines toe als in jouw plan zijn opgenomen.</p>
+          <p class="card-desc">Zoek een plaats, adres of postcode, of geef exacte coördinaten op — handig als de turbine in een weiland komt te staan, zonder adres. Kies daarna de tiphoogte-categorie en voeg zoveel turbines toe als in jouw plan zijn opgenomen.</p>
 
           <div class="field">
-            <label for="location-search">Locatie van de turbine</label>
-            <div class="search-wrap">
-              <input type="text" id="location-search" placeholder="Bijv. Cattenbroek, Montfoort of een postcode" autocomplete="off" />
-              <div class="suggestions" id="suggestions" role="listbox"></div>
+            <div class="location-mode-tabs" role="tablist" aria-label="Manier van locatie opgeven">
+              <button type="button" class="location-mode-tab active" id="mode-tab-search" role="tab" aria-selected="true">Zoeken op adres/plaats</button>
+              <button type="button" class="location-mode-tab" id="mode-tab-coords" role="tab" aria-selected="false">Coördinaten invoeren</button>
             </div>
-            <span class="field-hint" id="location-hint">Begin met typen — resultaten via de PDOK Locatieserver.</span>
+
+            <div id="mode-panel-search">
+              <label for="location-search">Locatie van de turbine</label>
+              <div class="search-wrap">
+                <input type="text" id="location-search" placeholder="Bijv. Cattenbroek, Montfoort of een postcode" autocomplete="off" />
+                <div class="suggestions" id="suggestions" role="listbox"></div>
+              </div>
+              <span class="field-hint" id="location-hint">Begin met typen — resultaten via de PDOK Locatieserver.</span>
+            </div>
+
+            <div id="mode-panel-coords" style="display:none;">
+              <label for="coords-input">Coördinaten (breedtegraad, lengtegraad)</label>
+              <div class="coords-row">
+                <input type="text" id="coords-input" placeholder="Bijv. 52.04041, 4.95839" autocomplete="off" inputmode="decimal" />
+                <button type="button" class="btn btn-secondary" id="coords-confirm-btn">Bevestig</button>
+              </div>
+              <button type="button" class="btn btn-secondary btn-block btn-pick-map" id="coords-pick-map-btn" style="margin-top: var(--space-2);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                Of wijs de locatie aan op de kaart
+              </button>
+              <span class="field-hint" id="coords-hint">WGS84-decimale graden — plak dit rechtstreeks vanuit Google Maps (rechtsklik op de kaart) of een GPS-toestel.</span>
+            </div>
           </div>
 
           <div class="field">

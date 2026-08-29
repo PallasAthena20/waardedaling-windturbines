@@ -159,6 +159,111 @@
   });
 
   /* ---------------------------------------------------------------------
+     Location input mode: search vs. raw coordinates
+     (turbines are often placed in a field, with no address at all)
+     --------------------------------------------------------------------- */
+  const modeTabSearch = document.getElementById('mode-tab-search');
+  const modeTabCoords = document.getElementById('mode-tab-coords');
+  const modePanelSearch = document.getElementById('mode-panel-search');
+  const modePanelCoords = document.getElementById('mode-panel-coords');
+  const coordsInput = document.getElementById('coords-input');
+  const coordsHint = document.getElementById('coords-hint');
+  const coordsConfirmBtn = document.getElementById('coords-confirm-btn');
+  let locationMode = 'search';
+
+  function setLocationMode(mode) {
+    locationMode = mode;
+    const isSearch = mode === 'search';
+    modeTabSearch.classList.toggle('active', isSearch);
+    modeTabCoords.classList.toggle('active', !isSearch);
+    modeTabSearch.setAttribute('aria-selected', String(isSearch));
+    modeTabCoords.setAttribute('aria-selected', String(!isSearch));
+    modePanelSearch.style.display = isSearch ? '' : 'none';
+    modePanelCoords.style.display = isSearch ? 'none' : '';
+    selectedLocation = null;
+    if (isSearch) {
+      searchInput.value = '';
+      locationHint.textContent = 'Begin met typen — resultaten via de PDOK Locatieserver.';
+    } else {
+      coordsInput.value = '';
+      coordsHint.textContent = 'WGS84-decimale graden — plak dit rechtstreeks vanuit Google Maps (rechtsklik op de kaart) of een GPS-toestel.';
+      coordsHint.classList.remove('hint-error');
+    }
+  }
+  modeTabSearch.addEventListener('click', () => setLocationMode('search'));
+  modeTabCoords.addEventListener('click', () => setLocationMode('coords'));
+
+  // Netherlands bounding box (generous, incl. Wadden islands / Caribbean excluded)
+  const NL_BOUNDS = { latMin: 50.7, latMax: 53.6, lonMin: 3.3, lonMax: 7.3 };
+
+  function parseCoordsInput(raw) {
+    if (!raw) return { error: 'Vul coördinaten in, bijv. 52.04041, 4.95839.' };
+    // Accept comma or whitespace separated, comma or dot as decimal separator per number
+    const cleaned = raw.trim().replace(/[;\t]+/g, ',');
+    const parts = cleaned.split(/[\s,]+/).filter(Boolean);
+    if (parts.length !== 2) {
+      return { error: 'Gebruik het formaat "breedtegraad, lengtegraad", bijv. 52.04041, 4.95839.' };
+    }
+    const lat = parseFloat(parts[0].replace(',', '.'));
+    const lon = parseFloat(parts[1].replace(',', '.'));
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return { error: 'Coördinaten konden niet worden herkend als getallen.' };
+    }
+    if (lat < NL_BOUNDS.latMin || lat > NL_BOUNDS.latMax || lon < NL_BOUNDS.lonMin || lon > NL_BOUNDS.lonMax) {
+      return { error: 'Deze coördinaten liggen buiten Nederland. Controleer of breedtegraad en lengtegraad niet zijn verwisseld (breedtegraad ligt in NL rond 50,7–53,6; lengtegraad rond 3,3–7,3).' };
+    }
+    return { lat, lon };
+  }
+
+  function confirmCoords() {
+    const result = parseCoordsInput(coordsInput.value);
+    if (result.error) {
+      coordsHint.textContent = result.error;
+      coordsHint.classList.add('hint-error');
+      selectedLocation = null;
+      return;
+    }
+    const { lat, lon } = result;
+    selectedLocation = {
+      label: `Coördinaten ${lat.toFixed(5)}, ${lon.toFixed(5)}`,
+      lat,
+      lon,
+      type: 'coordinaat',
+    };
+    coordsHint.classList.remove('hint-error');
+    coordsHint.textContent = `Bevestigd: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  }
+  coordsConfirmBtn.addEventListener('click', confirmCoords);
+  coordsInput.addEventListener('input', () => { selectedLocation = null; });
+  coordsInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      confirmCoords();
+    }
+  });
+
+  const coordsPickMapBtn = document.getElementById('coords-pick-map-btn');
+  let pickingOnMap = false;
+
+  function setPickingOnMap(active) {
+    pickingOnMap = active;
+    coordsPickMapBtn.classList.toggle('active', active);
+    coordsPickMapBtn.textContent = '';
+    const icon = document.createElement('span');
+    icon.innerHTML = active
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>';
+    coordsPickMapBtn.appendChild(icon);
+    coordsPickMapBtn.appendChild(document.createTextNode(active ? 'Annuleren — klik op de kaart' : 'Of wijs de locatie aan op de kaart'));
+    if (map.getCanvas) map.getCanvas().style.cursor = active ? 'crosshair' : '';
+    if (active) {
+      coordsHint.classList.remove('hint-error');
+      coordsHint.textContent = 'Klik op de gewenste plek op de kaart rechts om de turbinelocatie te kiezen.';
+    }
+  }
+  coordsPickMapBtn.addEventListener('click', () => setPickingOnMap(!pickingOnMap));
+
+  /* ---------------------------------------------------------------------
      Turbine state + map
      --------------------------------------------------------------------- */
   let turbines = []; // { id, label, lat, lon, category, method }
@@ -206,7 +311,24 @@
       paint: { 'line-color': '#ffffff', 'line-width': 0.6 },
     });
 
+    map.on('click', (e) => {
+      if (!pickingOnMap) return;
+      const { lat, lng } = e.lngLat;
+      coordsInput.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      selectedLocation = {
+        label: `Coördinaten ${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+        lat,
+        lon: lng,
+        type: 'coordinaat',
+      };
+      coordsHint.classList.remove('hint-error');
+      coordsHint.textContent = `Bevestigd via kaart: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      setPickingOnMap(false);
+      showToast('Locatie gekozen op de kaart.');
+    });
+
     map.on('click', 'buurten-fill', (e) => {
+      if (pickingOnMap) return;
       const f = e.features[0];
       const p = f.properties;
       new maplibregl.Popup({ closeButton: true })
@@ -326,8 +448,13 @@
 
   addBtn.addEventListener('click', () => {
     if (!selectedLocation) {
-      showToast('Kies eerst een locatie uit de suggesties.', true);
-      searchInput.focus();
+      if (locationMode === 'coords') {
+        showToast('Vul coördinaten in en klik op "Bevestig".', true);
+        coordsInput.focus();
+      } else {
+        showToast('Kies eerst een locatie uit de suggesties.', true);
+        searchInput.focus();
+      }
       return;
     }
     const category = categorySelect.value;
@@ -344,8 +471,11 @@
     renderMapCircles();
     hideResults();
     searchInput.value = '';
+    coordsInput.value = '';
     selectedLocation = null;
     locationHint.textContent = 'Begin met typen — resultaten via de PDOK Locatieserver.';
+    coordsHint.textContent = 'WGS84-decimale graden — plak dit rechtstreeks vanuit Google Maps (rechtsklik op de kaart) of een GPS-toestel.';
+    coordsHint.classList.remove('hint-error');
     showToast('Turbine toegevoegd.');
   });
 

@@ -220,6 +220,7 @@
     if (result.error) {
       coordsHint.textContent = result.error;
       coordsHint.classList.add('hint-error');
+      coordsInput.classList.add('input-error');
       selectedLocation = null;
       return;
     }
@@ -231,10 +232,15 @@
       type: 'coordinaat',
     };
     coordsHint.classList.remove('hint-error');
+    coordsInput.classList.remove('input-error');
     coordsHint.textContent = `Bevestigd: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
   }
   coordsConfirmBtn.addEventListener('click', confirmCoords);
-  coordsInput.addEventListener('input', () => { selectedLocation = null; });
+  coordsInput.addEventListener('input', () => {
+    selectedLocation = null;
+    coordsInput.classList.remove('input-error');
+    coordsHint.classList.remove('hint-error');
+  });
   coordsInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
